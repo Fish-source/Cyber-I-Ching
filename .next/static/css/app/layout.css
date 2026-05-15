@@ -516,6 +516,9 @@ video {
 .inset-\[-6px\] {
   inset: -6px;
 }
+.inset-\[4px\] {
+  inset: 4px;
+}
 .-left-10 {
   left: -2.5rem;
 }
@@ -593,6 +596,9 @@ video {
 .flex {
   display: flex;
 }
+.h-10 {
+  height: 2.5rem;
+}
 .h-2 {
   height: 0.5rem;
 }
@@ -604,9 +610,6 @@ video {
 }
 .h-4 {
   height: 1rem;
-}
-.h-8 {
-  height: 2rem;
 }
 .h-\[450px\] {
   height: 450px;
@@ -637,9 +640,6 @@ video {
 }
 .w-4 {
   width: 1rem;
-}
-.w-8 {
-  width: 2rem;
 }
 .w-\[450px\] {
   width: 450px;
@@ -853,6 +853,18 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 200px 200px;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.018;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cpath d='M40 0 L40 80' stroke='%23111' stroke-width='0.3' fill='none'/%3E%3Cpath d='M0 40 L80 40' stroke='%23111' stroke-width='0.3' fill='none'/%3E%3Ccircle cx='40' cy='40' r='12' stroke='%23111' stroke-width='0.2' fill='none'/%3E%3Cpath d='M40 28 Q48 40 40 52 Q32 40 40 28Z' stroke='%23111' stroke-width='0.15' fill='none'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 80px 80px;
 }
 
 .font-brush {

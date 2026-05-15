@@ -22,6 +22,11 @@ interface HexagramData {
   wisdom: string
 }
 
+interface CoinResult {
+  coinSum: number
+  sums: number[]
+}
+
 const LINE_NAMES = ['初', '二', '三', '四', '五', '上']
 const YAO_NAMES: Record<number, string> = {
   6: '老陰',
@@ -49,6 +54,12 @@ function castThreeCoins(): LineResult {
   const isYang = coinSum === 7 || coinSum === 9
   const isChanging = coinSum === 6 || coinSum === 9
   return { value: isYang ? 1 : 0, isChanging, coinSum }
+}
+
+function getCoinSums(coinSum: number): number[] {
+  return coinSum === 6 ? [2, 2, 2] :
+    coinSum === 7 ? [3, 2, 2] :
+    coinSum === 8 ? [3, 3, 2] : [3, 3, 3]
 }
 
 function findHexagram(bits: (0 | 1)[]): HexagramData {
@@ -98,7 +109,6 @@ function TaiChiIcon({ size = 88, rotation = 0 }: { size?: number; rotation?: num
   const r = size / 2
   const innerR = r / 2
   const dotR = r * 0.1
-
   return (
     <motion.svg
       width={size}
@@ -117,15 +127,9 @@ function TaiChiIcon({ size = 88, rotation = 0 }: { size?: number; rotation?: num
           <stop offset="0%" stopColor="rgba(255,252,245,1)" />
           <stop offset="100%" stopColor="rgba(240,235,225,0.95)" />
         </radialGradient>
-        <filter id="softEdge">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="0.3" />
-        </filter>
-        <clipPath id="leftHalf">
-          <rect x={0} y={0} width={r} height={size} />
-        </clipPath>
-        <clipPath id="rightHalf">
-          <rect x={r} y={0} width={r} height={size} />
-        </clipPath>
+        <filter id="softEdge"><feGaussianBlur in="SourceGraphic" stdDeviation="0.3" /></filter>
+        <clipPath id="leftHalf"><rect x={0} y={0} width={r} height={size} /></clipPath>
+        <clipPath id="rightHalf"><rect x={r} y={0} width={r} height={size} /></clipPath>
       </defs>
       <circle cx={r} cy={r} r={r - 0.5} fill="none" stroke="rgba(10,8,5,0.18)" strokeWidth="0.8" />
       <circle cx={r} cy={r} r={r - 1} fill="url(#inkGrad)" />
@@ -138,6 +142,33 @@ function TaiChiIcon({ size = 88, rotation = 0 }: { size?: number; rotation?: num
   )
 }
 
+function BronzeCoin({ face, delay }: { face: '字' | '背'; delay: number }) {
+  return (
+    <motion.div
+      initial={{ rotateY: 0, scale: 0, opacity: 0 }}
+      animate={{ rotateY: 720, scale: 1, opacity: 1 }}
+      transition={{ duration: 0.8, delay, ease: EASE_SMOOTH }}
+      className="relative"
+    >
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center font-kai text-sm"
+        style={{
+          background: 'radial-gradient(circle at 35% 30%, rgba(160,140,100,0.18), rgba(120,100,70,0.08))',
+          border: '2px solid rgba(120,100,70,0.35)',
+          color: 'rgba(10,8,5,0.75)',
+          boxShadow: '0 1px 4px rgba(10,8,5,0.08), inset 0 0 6px rgba(120,100,70,0.06)',
+        }}
+      >
+        {face}
+      </div>
+      <div
+        className="absolute inset-[4px] rounded-full pointer-events-none"
+        style={{ border: '1px solid rgba(120,100,70,0.12)' }}
+      />
+    </motion.div>
+  )
+}
+
 export default function CyberIChing() {
   const [lines, setLines] = useState<LineResult[]>([])
   const [phase, setPhase] = useState<Phase>('ready')
@@ -145,7 +176,8 @@ export default function CyberIChing() {
   const [changedHexagram, setChangedHexagram] = useState<HexagramData | null>(null)
   const [mutualHexagram, setMutualHexagram] = useState<HexagramData | null>(null)
   const [hasChanging, setHasChanging] = useState(false)
-  const [showCoins, setShowCoins] = useState(false)
+  const [coinsVisible, setCoinsVisible] = useState(false)
+  const [coinsExiting, setCoinsExiting] = useState(false)
   const [revealing, setRevealing] = useState(false)
   const [titleBounce, setTitleBounce] = useState(0)
   const [keywords, setKeywords] = useState<string[]>([])
@@ -155,16 +187,28 @@ export default function CyberIChing() {
   const chargeInterval = useRef<NodeJS.Timeout | null>(null)
   const chargeStart = useRef<number>(0)
   const latestIdx = useRef<number>(-1)
+  const bounceTimer = useRef<NodeJS.Timeout | null>(null)
 
   const taiChiRotation = useMemo(() => lines.length * 30, [lines.length])
 
-  const bounceTimer = useRef<NodeJS.Timeout | null>(null)
-
   const triggerTitleBounce = useCallback(() => {
-    setTitleBounce(-18)
+    setTitleBounce(-22)
     if (bounceTimer.current) clearTimeout(bounceTimer.current)
-    bounceTimer.current = setTimeout(() => setTitleBounce(0), 600)
   }, [])
+
+  const settleTitle = useCallback(() => {
+    if (bounceTimer.current) clearTimeout(bounceTimer.current)
+    bounceTimer.current = setTimeout(() => setTitleBounce(0), 50)
+  }, [])
+
+  const dismissCoins = useCallback(() => {
+    setCoinsExiting(true)
+    setTimeout(() => {
+      setCoinsVisible(false)
+      setCoinsExiting(false)
+      settleTitle()
+    }, 600)
+  }, [settleTitle])
 
   const resetAll = useCallback(() => {
     setLines([])
@@ -173,72 +217,67 @@ export default function CyberIChing() {
     setChangedHexagram(null)
     setMutualHexagram(null)
     setHasChanging(false)
-    setShowCoins(false)
+    setCoinsVisible(false)
+    setCoinsExiting(false)
     setRevealing(false)
     setTitleBounce(0)
     setKeywords([])
     setCharging(false)
     setChargeProgress(0)
     latestIdx.current = -1
+    if (bounceTimer.current) clearTimeout(bounceTimer.current)
   }, [])
 
   const castLine = useCallback(() => {
+    if (revealing) return
+
+    if (coinsVisible) {
+      dismissCoins()
+      setTimeout(() => executeCast(), 650)
+    } else {
+      executeCast()
+    }
+
+    function executeCast() {
+      if (phase === 'ready') {
+        setPhase('casting')
+      }
+
+      triggerTitleBounce()
+
+      const result = castThreeCoins()
+      const newLines = [...lines, result]
+      latestIdx.current = newLines.length - 1
+      setLines(newLines)
+
+      setCoinsVisible(true)
+
+      if (newLines.length < 6) {
+        setPhase('casting')
+      } else {
+        setRevealing(true)
+        const divinationTimer = setInterval(() => {}, 200)
+        setTimeout(() => {
+          clearInterval(divinationTimer)
+          const mainHex = findHexagram(newLines.map((l) => l.value))
+          setHexagram(mainHex)
+          setKeywords(extractKeywords(mainHex.name, mainHex.wisdom))
+          const { bits, hasChange } = computeChangedHexagram(newLines)
+          setHasChanging(hasChange)
+          if (hasChange) setChangedHexagram(findHexagram(bits))
+          setMutualHexagram(findHexagram(computeMutualHexagram(newLines)))
+          setPhase('result')
+          setRevealing(false)
+        }, 2400)
+      }
+    }
+  }, [lines, phase, revealing, coinsVisible, dismissCoins, triggerTitleBounce])
+
+  const handleChargeStart = useCallback(() => {
     if (phase === 'result') {
       resetAll()
       return
     }
-    if (revealing) return
-
-    if (phase === 'ready') {
-      setPhase('casting')
-    }
-
-    triggerTitleBounce()
-
-    const result = castThreeCoins()
-
-    const newLines = [...lines, result]
-    latestIdx.current = newLines.length - 1
-    setLines(newLines)
-
-    setShowCoins(true)
-    setTimeout(() => setShowCoins(false), 900)
-
-    if (newLines.length < 6) {
-      setPhase('casting')
-    } else {
-      setRevealing(true)
-      let divStep = 0
-      const divinationTimer = setInterval(() => {
-        divStep++
-      }, 200)
-
-      setTimeout(() => {
-        clearInterval(divinationTimer)
-
-        const mainHex = findHexagram(newLines.map((l) => l.value))
-        setHexagram(mainHex)
-
-        const kws = extractKeywords(mainHex.name, mainHex.wisdom)
-        setKeywords(kws)
-
-        const { bits, hasChange } = computeChangedHexagram(newLines)
-        setHasChanging(hasChange)
-        if (hasChange) {
-          setChangedHexagram(findHexagram(bits))
-        }
-
-        const mutualBits = computeMutualHexagram(newLines)
-        setMutualHexagram(findHexagram(mutualBits))
-
-        setPhase('result')
-        setRevealing(false)
-      }, 2400)
-    }
-  }, [lines, phase, revealing, resetAll, triggerTitleBounce])
-
-  const handleChargeStart = useCallback(() => {
-    if (phase === 'result') return
     if (revealing) return
 
     setCharging(true)
@@ -256,7 +295,7 @@ export default function CyberIChing() {
         castLine()
       }
     }, 16)
-  }, [castLine, phase, revealing])
+  }, [castLine, phase, revealing, resetAll])
 
   const handleChargeEnd = useCallback(() => {
     if (chargeInterval.current) clearInterval(chargeInterval.current)
@@ -267,11 +306,12 @@ export default function CyberIChing() {
   }, [charging])
 
   const changingCount = lines.filter((l) => l.isChanging).length
-
   const chargeStep = useMemo(() => {
     if (!charging) return -1
     return Math.min(Math.floor(chargeProgress * CHARGING_STEPS.length), CHARGING_STEPS.length - 1)
   }, [charging, chargeProgress])
+
+  const lastCoinSums = lines.length > 0 ? getCoinSums(lines[lines.length - 1].coinSum) : [3, 3, 3]
 
   return (
     <div className="relative min-h-screen overflow-hidden select-none" style={{ background: '#f5f0e8' }}>
@@ -313,13 +353,10 @@ export default function CyberIChing() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: titleBounce }}
-          transition={{ duration: 0.8, ease: EASE_SMOOTH }}
+          transition={{ duration: 1.0, ease: EASE_SMOOTH }}
           className="mb-2 text-center"
         >
-          <h1
-            className="text-6xl md:text-8xl font-seal"
-            style={{ color: 'rgba(10,8,5,0.9)' }}
-          >
+          <h1 className="text-6xl md:text-8xl font-seal" style={{ color: 'rgba(10,8,5,0.9)' }}>
             爻術
           </h1>
           <motion.p
@@ -350,42 +387,31 @@ export default function CyberIChing() {
           )}
         </AnimatePresence>
 
-        {/* 硬幣動畫 */}
+        {/* 古銅幣 - 持續顯示直到下次拋 */}
         <AnimatePresence>
-          {showCoins && lines.length > 0 && (
+          {coinsVisible && lines.length > 0 && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.6 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8, y: -15 }}
-              transition={{ duration: 0.5, ease: EASE_SMOOTH }}
-              className="mb-2 flex gap-3 items-center"
+              initial={{ opacity: 0, scale: 0.6, y: 10 }}
+              animate={coinsExiting
+                ? { opacity: 0, scale: 0.7, y: -20 }
+                : { opacity: 1, scale: 1, y: 0 }
+              }
+              exit={{ opacity: 0, scale: 0.7, y: -20 }}
+              transition={{ duration: coinsExiting ? 0.5 : 0.6, ease: EASE_SMOOTH }}
+              className="mb-3 flex gap-3 items-center"
             >
-              {[0, 1, 2].map((i) => {
-                const coinVal = lines[lines.length - 1]?.coinSum
-                const sums =
-                  coinVal === 6 ? [2, 2, 2] :
-                  coinVal === 7 ? [3, 2, 2] :
-                  coinVal === 8 ? [3, 3, 2] : [3, 3, 3]
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ rotateY: 0, scale: 0 }}
-                    animate={{ rotateY: 720, scale: 1 }}
-                    transition={{ duration: 0.7, delay: i * 0.12, ease: EASE_SMOOTH }}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-kai"
-                    style={{
-                      background: 'rgba(10,8,5,0.06)',
-                      border: '1px solid rgba(10,8,5,0.2)',
-                      color: 'rgba(10,8,5,0.7)',
-                    }}
-                  >
-                    {sums[i] === 3 ? '字' : '背'}
-                  </motion.div>
-                )
-              })}
-              <span className="ml-2 text-xs font-kai" style={{ color: 'rgba(10,8,5,0.55)' }}>
+              {lastCoinSums.map((s, i) => (
+                <BronzeCoin key={i} face={s === 3 ? '字' : '背'} delay={i * 0.12} />
+              ))}
+              <motion.span
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.5, duration: 0.4, ease: EASE_SMOOTH }}
+                className="ml-2 text-xs font-kai"
+                style={{ color: 'rgba(10,8,5,0.55)' }}
+              >
                 {YAO_NAMES[lines[lines.length - 1]?.coinSum]}
-              </span>
+              </motion.span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -400,46 +426,29 @@ export default function CyberIChing() {
             onPointerUp={handleChargeEnd}
             onPointerLeave={handleChargeEnd}
             disabled={revealing}
-            whileHover={{ scale: 1.04 }}
+            whileHover={{ scale: phase === 'result' ? 1.04 : 1.02 }}
             whileTap={{ scale: 0.96 }}
             className="relative cursor-pointer touch-none"
             style={{ width: 88, height: 88, background: 'none', border: 'none', padding: 0 }}
           >
             <TaiChiIcon size={88} rotation={taiChiRotation} />
 
-            {/* 蓄力進度環 */}
             {charging && (
               <svg
                 className="absolute inset-0"
-                width={88}
-                height={88}
-                viewBox="0 0 88 88"
+                width={88} height={88} viewBox="0 0 88 88"
                 style={{ transform: 'rotate(-90deg)' }}
               >
-                <circle
-                  cx={44}
-                  cy={44}
-                  r={42}
-                  fill="none"
-                  stroke="rgba(10,8,5,0.08)"
-                  strokeWidth="2"
-                />
+                <circle cx={44} cy={44} r={42} fill="none" stroke="rgba(10,8,5,0.08)" strokeWidth="2" />
                 <motion.circle
-                  cx={44}
-                  cy={44}
-                  r={42}
-                  fill="none"
-                  stroke="rgba(10,8,5,0.3)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeDasharray={Math.PI * 84}
+                  cx={44} cy={44} r={42} fill="none" stroke="rgba(10,8,5,0.3)" strokeWidth="2"
+                  strokeLinecap="round" strokeDasharray={Math.PI * 84}
                   animate={{ strokeDashoffset: Math.PI * 84 * (1 - chargeProgress) }}
                   transition={{ duration: 0.05, ease: 'linear' }}
                 />
               </svg>
             )}
 
-            {/* 蓄力文字 */}
             {charging && chargeStep >= 0 && (
               <motion.div
                 key={chargeStep}
@@ -447,33 +456,24 @@ export default function CyberIChing() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 1.2 }}
                 className="absolute inset-0 flex items-center justify-center pointer-events-none font-kai text-lg"
-                style={{
-                  color: 'rgba(10,8,5,0.55)',
-                  transform: `rotate(${-taiChiRotation}deg)`,
-                  transition: 'transform 0s',
-                }}
+                style={{ color: 'rgba(10,8,5,0.55)', transform: `rotate(${-taiChiRotation}deg)`, transition: 'transform 0s' }}
               >
                 {CHARGING_STEPS[chargeStep]}
               </motion.div>
             )}
 
-            {/* 結果態重置 */}
             {!charging && phase === 'result' && (
               <div
                 className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 style={{ transform: `rotate(${-taiChiRotation}deg)`, transition: 'transform 1.2s cubic-bezier(0.22, 1, 0.36, 1)' }}
               >
-                <span
-                  className="font-kai text-lg"
-                  style={{ color: 'rgba(10,8,5,0.7)', transition: 'color 0.6s ease' }}
-                >
+                <span className="font-kai text-lg" style={{ color: 'rgba(10,8,5,0.7)', transition: 'color 0.6s ease' }}>
                   重
                 </span>
               </div>
             )}
           </motion.button>
 
-          {/* 蓄力時墨跡聚集特效 */}
           <AnimatePresence>
             {charging && (
               <motion.div
@@ -482,9 +482,7 @@ export default function CyberIChing() {
                 exit={{ scale: 1.5, opacity: 0 }}
                 transition={{ duration: 0.3 }}
                 className="absolute inset-[-16px] rounded-full pointer-events-none"
-                style={{
-                  background: `radial-gradient(circle, rgba(10,8,5,${0.02 + chargeProgress * 0.04}) 0%, transparent 60%)`,
-                }}
+                style={{ background: `radial-gradient(circle, rgba(10,8,5,${0.02 + chargeProgress * 0.04}) 0%, transparent 60%)` }}
               />
             )}
           </AnimatePresence>
@@ -622,25 +620,16 @@ export default function CyberIChing() {
                 style={{ background: 'rgba(10,8,5,0.12)' }}
               />
 
-              {/* 互卦 */}
               {mutualHexagram && mutualHexagram.name !== hexagram.name && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.85, duration: 0.6, ease: EASE_SMOOTH }}
                   className="mb-4 p-3"
-                  style={{
-                    background: 'rgba(10,8,5,0.02)',
-                    border: '1px solid rgba(10,8,5,0.06)',
-                  }}
+                  style={{ background: 'rgba(10,8,5,0.02)', border: '1px solid rgba(10,8,5,0.06)' }}
                 >
-                  <p className="text-xs tracking-[0.15em] mb-1 font-kai" style={{ color: 'rgba(10,8,5,0.45)' }}>
-                    互卦
-                  </p>
-                  <p
-                    className="text-lg font-bold tracking-[0.15em] mb-1 font-brush"
-                    style={{ color: 'rgba(10,8,5,0.7)' }}
-                  >
+                  <p className="text-xs tracking-[0.15em] mb-1 font-kai" style={{ color: 'rgba(10,8,5,0.45)' }}>互卦</p>
+                  <p className="text-lg font-bold tracking-[0.15em] mb-1 font-brush" style={{ color: 'rgba(10,8,5,0.7)' }}>
                     {mutualHexagram.symbol} {mutualHexagram.name}
                   </p>
                   <p className="text-xs font-kai" style={{ color: 'rgba(10,8,5,0.5)' }}>
@@ -649,7 +638,6 @@ export default function CyberIChing() {
                 </motion.div>
               )}
 
-              {/* 變爻 */}
               {hasChanging && changingCount > 0 && (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -666,11 +654,7 @@ export default function CyberIChing() {
                         <span
                           key={i}
                           className="text-xs px-1.5 py-0.5 font-kai"
-                          style={{
-                            color: 'rgba(10,8,5,0.65)',
-                            background: 'rgba(10,8,5,0.04)',
-                            border: '1px solid rgba(10,8,5,0.1)',
-                          }}
+                          style={{ color: 'rgba(10,8,5,0.65)', background: 'rgba(10,8,5,0.04)', border: '1px solid rgba(10,8,5,0.1)' }}
                         >
                           {LINE_NAMES[i]}爻{YAO_NAMES[l.coinSum]}
                         </span>
@@ -680,25 +664,16 @@ export default function CyberIChing() {
                 </motion.div>
               )}
 
-              {/* 變卦 */}
               {hasChanging && changedHexagram && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.95, duration: 0.6, ease: EASE_SMOOTH }}
                   className="mb-4 p-3"
-                  style={{
-                    background: 'rgba(10,8,5,0.025)',
-                    border: '1px solid rgba(10,8,5,0.07)',
-                  }}
+                  style={{ background: 'rgba(10,8,5,0.025)', border: '1px solid rgba(10,8,5,0.07)' }}
                 >
-                  <p className="text-xs tracking-[0.15em] mb-1 font-kai" style={{ color: 'rgba(10,8,5,0.5)' }}>
-                    之卦（變卦）
-                  </p>
-                  <p
-                    className="text-xl font-bold tracking-[0.15em] mb-1 font-brush"
-                    style={{ color: 'rgba(10,8,5,0.78)' }}
-                  >
+                  <p className="text-xs tracking-[0.15em] mb-1 font-kai" style={{ color: 'rgba(10,8,5,0.5)' }}>之卦（變卦）</p>
+                  <p className="text-xl font-bold tracking-[0.15em] mb-1 font-brush" style={{ color: 'rgba(10,8,5,0.78)' }}>
                     {changedHexagram.symbol} {changedHexagram.name}
                   </p>
                   <p className="text-xs font-kai" style={{ color: 'rgba(10,8,5,0.55)' }}>
@@ -707,7 +682,6 @@ export default function CyberIChing() {
                 </motion.div>
               )}
 
-              {/* 數智禪語 */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -715,9 +689,7 @@ export default function CyberIChing() {
                 className="py-3"
                 style={{ borderTop: '1px solid rgba(10,8,5,0.08)' }}
               >
-                <p className="text-xs tracking-[0.15em] mb-2 font-kai" style={{ color: 'rgba(10,8,5,0.5)' }}>
-                  數智禪語
-                </p>
+                <p className="text-xs tracking-[0.15em] mb-2 font-kai" style={{ color: 'rgba(10,8,5,0.5)' }}>數智禪語</p>
                 <p className="text-sm leading-relaxed font-kai" style={{ color: 'rgba(10,8,5,0.72)' }}>
                   {hexagram.wisdom}
                 </p>
@@ -739,7 +711,6 @@ export default function CyberIChing() {
           )}
         </AnimatePresence>
 
-        {/* 底部紀年 */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
